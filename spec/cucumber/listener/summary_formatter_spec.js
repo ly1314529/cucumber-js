@@ -137,152 +137,80 @@ describe("Cucumber.Listener.SummaryFormatter", function () {
     });
   });
 
-
-  describe("storeFailedStepResult()", function () {
-    var failureException, stepResult;
-
-    beforeEach(function () {
-      spyOn(summaryFormatter, 'appendStringToFailedStepResultLogBuffer');
-    });
-
-    describe("when the failure exception has a stack", function () {
-      beforeEach(function () {
-        failureException = {stack: 'failure exception stack'};
-        stepResult       = createSpyWithStubs("failed step result", { getFailureException: failureException });
-      });
-
-      it("appends the stack to the failed step results log buffer", function () {
-        summaryFormatter.storeFailedStepResult(stepResult);
-        expect(summaryFormatter.appendStringToFailedStepResultLogBuffer).toHaveBeenCalledWith('failure exception stack');
-      });
-    });
-
-    describe("when the failure exception has no stack", function () {
-      beforeEach(function () {
-        failureException = 'failure exception';
-        stepResult       = createSpyWithStubs("failed step result", { getFailureException: failureException });
-      });
-
-      it("appends the expception to the failed step results log buffer", function () {
-        summaryFormatter.storeFailedStepResult(stepResult);
-        expect(summaryFormatter.appendStringToFailedStepResultLogBuffer).toHaveBeenCalledWith('failure exception');
-      });
-    });
-  });
-
-  describe("storeFailedScenario()", function () {
-    var path = require('path');
-
-    var failedScenario, name, relativeUri, uri, line, string;
-
-    beforeEach(function () {
-      name           = "some failed scenario";
-      relativeUri    = path.normalize("path/to/some.feature");
-      uri            = path.join(process.cwd(), relativeUri);
-      line           = "123";
-      string         = relativeUri + ":" + line + " # Scenario: " + name;
-      failedScenario = createSpyWithStubs("failedScenario", {getName: name, getUri: uri, getLine: line});
-      spyOn(summaryFormatter, 'appendStringToFailedScenarioLogBuffer');
-    });
-
-    it("gets the name of the scenario", function () {
-      summaryFormatter.storeFailedScenario(failedScenario);
-      expect(failedScenario.getName).toHaveBeenCalled();
-    });
-
-    it("gets the URI of the scenario", function () {
-      summaryFormatter.storeFailedScenario(failedScenario);
-      expect(failedScenario.getUri).toHaveBeenCalled();
-    });
-
-    it("gets the line of the scenario", function () {
-      summaryFormatter.storeFailedScenario(failedScenario);
-      expect(failedScenario.getLine).toHaveBeenCalled();
-    });
-
-    it("appends the scenario details to the failed scenario log buffer", function () {
-      summaryFormatter.storeFailedScenario(failedScenario);
-      expect(summaryFormatter.appendStringToFailedScenarioLogBuffer).toHaveBeenCalledWith(string);
-    });
-  });
-
-  describe("storeUndefinedStepResult()", function () {
-    var snippetSyntax, snippetBuilder, snippet, step, stepResult;
-
-    beforeEach(function () {
-      snippetSyntax  = createSpyWithStubs("snippet syntax");
-      step           = createSpy("step");
-      stepResult     = createSpyWithStubs("step result", {getStep: step});
-      snippet        = createSpy("step definition snippet");
-      snippetBuilder = createSpyWithStubs("snippet builder", {buildSnippet: snippet});
-      spyOn(Cucumber.SupportCode, 'StepDefinitionSnippetBuilder').and.returnValue(snippetBuilder);
-      spyOn(summaryFormatter, 'appendStringToUndefinedStepLogBuffer');
-      options.snippetSyntax = snippetSyntax;
-    });
-
-    it("creates a new step definition snippet builder", function () {
-      summaryFormatter.storeUndefinedStepResult(stepResult);
-      expect(Cucumber.SupportCode.StepDefinitionSnippetBuilder).toHaveBeenCalledWith(step, snippetSyntax);
-    });
-
-    it("builds the step definition", function () {
-      summaryFormatter.storeUndefinedStepResult(stepResult);
-      expect(snippetBuilder.buildSnippet).toHaveBeenCalled();
-    });
-
-    it("appends the snippet to the undefined step log buffer", function () {
-      summaryFormatter.storeUndefinedStepResult(stepResult);
-      expect(summaryFormatter.appendStringToUndefinedStepLogBuffer).toHaveBeenCalledWith(snippet);
-    });
-  });
-
   describe("logSummary()", function () {
     beforeEach(function () {
       spyOn(summaryFormatter, 'logScenariosSummary');
       spyOn(summaryFormatter, 'logStepsSummary');
       spyOn(summaryFormatter, 'logDuration');
-      spyOn(summaryFormatter, 'logFailedStepResults');
-      spyOn(summaryFormatter, 'logUndefinedStepSnippets');
-      spyOn(summaryFormatter, 'logFailedScenarios');
-      spyOnStub(statsJournal, 'witnessedAnyFailedStep');
-      spyOnStub(statsJournal, 'witnessedAnyUndefinedStep');
+      spyOn(summaryFormatter, 'logFailures');
+      spyOn(summaryFormatter, 'logWarnings');
     });
 
-    describe("when there are failed steps", function () {
+    describe("without failures or warnings", function () {
+      beforeEach(function() {
+        summaryFormatter.logSummary();
+      })
+
+      it("does not log failures", function () {
+        expect(summaryFormatter.logFailures).not.toHaveBeenCalled();
+      });
+
+      it("does not log warnings", function () {
+        expect(summaryFormatter.logWarnings).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when there is a failed step", function () {
       beforeEach(function () {
-        var name           = "some failed scenario";
-        var uri            = "some uri";
-        var line           = "123";
-        var failedScenario = createSpyWithStubs("failedScenario", {getName: name, getUri: uri, getLine: line});
-        summaryFormatter.storeFailedScenario(failedScenario);
+        var failureException = {stack: 'failure exception stack'};
+        var stepResult = createSpyWithStubs("failed step result", { getFailureException: failureException });
+        summaryFormatter.storeFailedStepResult(stepResult);
       });
 
-      it("logs the failed steps", function () {
+      it("logs the failures", function () {
         summaryFormatter.logSummary();
-        expect(summaryFormatter.logFailedStepResults).toHaveBeenCalled();
-      });
-
-      it("logs the failed scenarions", function () {
-        summaryFormatter.logSummary();
-        expect(summaryFormatter.logFailedScenarios).toHaveBeenCalled();
-      });
-
-      describe("when hiding failed steps", function () {
-        beforeEach(function () {
-          options.hideFailedStepResults = true;
-        });
-
-        it("does not log the failed steps", function () {
-          summaryFormatter.logSummary();
-          expect(summaryFormatter.logFailedStepResults).not.toHaveBeenCalled();
-        });
+        expect(summaryFormatter.logFailures).toHaveBeenCalled();
       });
     });
 
-    describe("when there are no failed steps", function () {
-      it("does not log failed steps", function () {
+    describe("when there is an ambiguous step", function () {
+      beforeEach(function () {
+        var stepDefintion1 = createSpyWithStubs('step defintion', {getPattern: 'a', getUri: 'path/1', getLine: 1});
+        var stepDefintion2 = createSpyWithStubs('step defintion', {getPattern: 'b', getUri: 'path/2', getLine: 2});
+        var stepResult = createSpyWithStubs("step result", {getAmbiguousStepDefinitions: [stepDefintion1, stepDefintion2]});
+        summaryFormatter.storeAmbiguousStepResult(stepResult);
+      });
+
+      it("logs the failures", function () {
         summaryFormatter.logSummary();
-        expect(summaryFormatter.logFailedStepResults).not.toHaveBeenCalled();
+        expect(summaryFormatter.logFailures).toHaveBeenCalled();
+      });
+    });
+
+    describe("when there is an undefined step", function () {
+      beforeEach(function () {
+        var step = createSpy("step");
+        var stepResult = createSpy("step result", {getStep: step});
+        var snippetBuilder = createSpyWithStubs("snippet builder", {buildSnippet: 'snippet'});
+        spyOn(Cucumber.SupportCode, 'StepDefinitionSnippetBuilder').and.returnValue(snippetBuilder);
+        summaryFormatter.storeUndefinedStepResult(stepResult);
+      });
+
+      it("logs the warnings", function () {
+        summaryFormatter.logSummary();
+        expect(summaryFormatter.logWarnings).toHaveBeenCalled();
+      });
+    });
+
+    describe("when there is a pending step", function () {
+      beforeEach(function () {
+        var stepResult = createSpyWithStubs("step result", {getPendingReason: 'not ready'});
+        summaryFormatter.storePendingStepResult(stepResult);
+      });
+
+      it("logs warnings", function () {
+        summaryFormatter.logSummary();
+        expect(summaryFormatter.logWarnings).toHaveBeenCalled();
       });
     });
 
@@ -300,72 +228,60 @@ describe("Cucumber.Listener.SummaryFormatter", function () {
       summaryFormatter.logSummary();
       expect(summaryFormatter.logDuration).toHaveBeenCalled();
     });
+  });
 
-    describe("when there are undefined steps", function () {
+  describe("logFailures()", function () {
+    var scenario, step;
+
+    beforeEach(function() {
+      scenario = createSpyWithStubs('step', {getKeyword: 'scenarioKeyword', getName: 'scenarioName', getUri: 'path/to/scenario', getLine: 1});
+      step = createSpyWithStubs('step', {getKeyword: 'stepKeyword ', getName: 'stepName', getUri: 'path/to/step', getLine: 2, getScenario: scenario});
+    });
+
+    describe("when there is a failed step", function () {
       beforeEach(function () {
-        var step = createSpy("step");
-        var stepResult = createSpy("step result", {getStep: step});
-        var snippet = createSpy("step definition snippet");
-        var snippetBuilder = createSpyWithStubs("snippet builder", {buildSnippet: snippet});
-        spyOn(Cucumber.SupportCode, 'StepDefinitionSnippetBuilder').and.returnValue(snippetBuilder);
-        summaryFormatter.storeUndefinedStepResult(stepResult);
+        var stepDefintion = createSpyWithStubs('step defintion', {getPattern: 'a', getUri: 'path/to/stepDefintion', getLine: 3});
+        var failureException = {stack: 'failure exception stack'};
+        var stepResult = createSpyWithStubs("failed step result", {getFailureException: failureException, getStepDefinition: stepDefintion, getStep: step});
+        summaryFormatter.storeFailedStepResult(stepResult);
       });
 
-      it("logs the undefined step snippets", function () {
-        summaryFormatter.logSummary();
-        expect(summaryFormatter.logUndefinedStepSnippets).toHaveBeenCalled();
+      it("logs the failures", function () {
+        summaryFormatter.logFailures();
+        expect(summaryFormatter.log).toHaveBeenCalledWith('Failures:\n\n');
+        console.log(encodeURIComponent(summaryFormatter.log.calls.mostRecent().args[0]));
+        var expected =
+          '1) scenarioKeyword: scenarioName ' + colors.gray('# path/to/scenario:1') + '\n' +
+          '  stepKeyword stepName ' + colors.gray('# path/to/stepDefintion:3') + '\n' +
+          '    ' + colors.red('failure exception stack') + '\n\n'
+        console.log(encodeURIComponent(expected));
+        expect(summaryFormatter.log).toHaveBeenCalledWith(
+          '1) scenarioKeyword: scenarioName ' + colors.gray('# path/to/scenario:1') + '\n' +
+          '  stepKeyword stepName ' + colors.gray('# path/to/stepDefintion:3') + '\n' +
+          '    ' + colors.red('failure exception stack') + '\n\n'
+        );
       });
     });
 
-    describe("when there are no undefined steps", function () {
-      it("does not log the undefined step snippets", function () {
-        summaryFormatter.logSummary();
-        expect(summaryFormatter.logUndefinedStepSnippets).not.toHaveBeenCalled();
+    describe("when there is an ambiguous step", function () {
+      beforeEach(function () {
+        var stepDefinition1 = createSpyWithStubs('step definition', {getPattern: 'pattern 1', getUri: 'path/to/stepDefinition1', getLine: 3});
+        var stepDefinition2 = createSpyWithStubs('step definition', {getPattern: 'pattern 2', getUri: 'path/to/stepDefinition2', getLine: 4});
+        var stepResult = createSpyWithStubs("step result", {getAmbiguousStepDefinitions: [stepDefinition1, stepDefinition2], getStep: step, getStepDefinition: null});
+        summaryFormatter.storeAmbiguousStepResult(stepResult);
       });
-    });
-  });
 
-  describe("logFailedStepResults()", function () {
-    var failedStepResultLogBuffer;
-
-    beforeEach(function () {
-      failedStepResultLogBuffer = "failed step result log buffer";
-      spyOn(summaryFormatter, 'getFailedStepResultLogBuffer').and.returnValue(failedStepResultLogBuffer);
-      summaryFormatter.logFailedStepResults();
-    });
-
-    it("logs a failed step results header", function () {
-      expect(summaryFormatter.log).toHaveBeenCalledWith('(::) failed steps (::)\n\n');
-    });
-
-    it("logs the failed step results details", function () {
-      expect(summaryFormatter.log).toHaveBeenCalledWith(failedStepResultLogBuffer);
-    });
-  });
-
-  describe("logFailedScenarios()", function () {
-    var failedScenarioLogBuffer;
-
-    beforeEach(function () {
-      failedScenarioLogBuffer = createSpy("failed scenario log buffer");
-      spyOn(summaryFormatter, 'getFailedScenarioLogBuffer').and.returnValue(failedScenarioLogBuffer);
-      summaryFormatter.logFailedScenarios();
-    });
-
-    it("logs a failed scenarios header", function () {
-      expect(summaryFormatter.log).toHaveBeenCalledWith("Failing scenarios:\n");
-    });
-
-    it("gets the failed scenario details from its log buffer", function () {
-      expect(summaryFormatter.getFailedScenarioLogBuffer).toHaveBeenCalled();
-    });
-
-    it("logs the failed scenario details", function () {
-      expect(summaryFormatter.log).toHaveBeenCalledWith(failedScenarioLogBuffer);
-    });
-
-    it("logs a line break", function () {
-      expect(summaryFormatter.log).toHaveBeenCalledWith("\n");
+      it("logs the failures", function () {
+        summaryFormatter.logFailures();
+        expect(summaryFormatter.log).toHaveBeenCalledWith('Failures:\n\n');
+        expect(summaryFormatter.log).toHaveBeenCalledWith(
+          '1) scenarioKeyword: scenarioName ' + colors.gray('# path/to/scenario:1') + '\n' +
+          '  stepKeyword stepName' + '\n' +
+          '    ' + colors.red('Multiple step definitions match:' + '\n' +
+          '      ' + 'pattern 1 ' + colors.gray('# path/to/stepDefinition1:3') + '\n' +
+          '      ' + 'pattern 2 ' + colors.gray('# path/to/stepDefinition2:4')) + '\n\n'
+        );
+      });
     });
   });
 
@@ -531,35 +447,6 @@ describe("Cucumber.Listener.SummaryFormatter", function () {
         summaryFormatter.logDuration();
         expect(summaryFormatter.log).toHaveBeenCalledWith('12m34.567s\n');
       });
-    });
-  });
-
-  describe("logUndefinedStepSnippets()", function () {
-    var undefinedStepLogBuffer;
-
-    beforeEach(function () {
-      // Undefined Step Log buffer is string
-      undefinedStepLogBuffer = 'undefinedStepsLogBuffer';
-      spyOn(summaryFormatter, 'getUndefinedStepLogBuffer').and.returnValue(undefinedStepLogBuffer);
-      // switch snippet output on
-      options.snippets = true;
-    });
-
-    it("logs a little explanation about the snippets", function () {
-      summaryFormatter.logUndefinedStepSnippets();
-      var expectedString = colors.yellow("\nYou can implement step definitions for undefined steps with these snippets:\n\n");
-      expect(summaryFormatter.log).toHaveBeenCalledWith(expectedString);
-    });
-
-    it("gets the undefined steps log buffer", function () {
-      summaryFormatter.logUndefinedStepSnippets();
-      expect(summaryFormatter.getUndefinedStepLogBuffer).toHaveBeenCalled();
-    });
-
-    it("logs the undefined steps", function () {
-      summaryFormatter.logUndefinedStepSnippets();
-      var expectedString = colors.yellow(undefinedStepLogBuffer);
-      expect(summaryFormatter.log).toHaveBeenCalledWith(expectedString);
     });
   });
 });
